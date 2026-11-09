@@ -223,6 +223,43 @@ def test_cors_disallowed_preflight(
     }
     response = client.options("/", headers=headers)
     assert response.text == "Disallowed CORS headers"
+def test_cors_preflight_allows_empty_header_elements(
+    test_client_factory: TestClientFactory,
+) -> None:
+    # Regression test: empty elements in Access-Control-Request-Headers must be
+    # ignored (RFC 9110 Section 5.6.1.2), not rejected as disallowed headers.
+    def homepage(request: Request) -> PlainTextResponse:
+        return PlainTextResponse("ok")
+
+    app = Starlette(
+        routes=[Route("/", endpoint=homepage)],
+        middleware=[
+            Middleware(
+                CORSMiddleware,
+                allow_origins=["*"],
+                allow_methods=["*"],
+                allow_headers=["x-token", "authorization"],
+            )
+        ],
+    )
+
+    client = test_client_factory(app)
+
+    for headers in [
+        {
+            "Origin": "https://example.com",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "x-token, , authorization",
+        },
+        {
+            "Origin": "https://example.com",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "x-token, authorization",
+        },
+    ]:
+        response = client.options("/", headers=headers)
+        assert response.status_code == 200, response.text
+        assert "access-control-allow-headers" in response.headers
 
 
 def test_preflight_allows_request_origin_if_origins_wildcard_and_credentials_allowed(

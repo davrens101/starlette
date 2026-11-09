@@ -125,7 +125,10 @@ class CORSMiddleware:
             headers["Access-Control-Allow-Headers"] = requested_headers
         elif requested_headers is not None:
             for header in [h.lower() for h in requested_headers.split(",")]:
-                if header.strip() not in self.allow_headers:
+                header = header.strip()
+                if not header:
+                    continue
+                if header not in self.allow_headers:
                     failures.append("headers")
                     break
 
